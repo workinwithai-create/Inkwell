@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { InkwellDesk } from "@/components/inkwell-desk";
+import { UnifiedInkWorkspace } from "@/components/unified-ink-workspace";
 
 export const Route = createFileRoute("/")({
-  component: InkwellDesk,
+  component: UnifiedInkWorkspace,
 });
