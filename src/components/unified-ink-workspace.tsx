@@ -5,6 +5,14 @@ import { InkwellDesk } from "@/components/inkwell-desk";
 const SONG_KEY = "pipe_dreams_song_context_v1";
 const INKWELL_KEY = "inkwell-map-v1";
 const AURAMIX_PREVIEW = "https://auramix-git-preview-mantra-unified-workflow-release-forge.vercel.app/";
+const DEFAULT_CONTEXT = {
+  title: "Untitled song",
+  key: "",
+  bpm: 96,
+  tuning: 432,
+  projectId: "",
+  updatedAt: 0,
+} satisfies SongContext;
 
 type SongContext = {
   title: string;
@@ -24,11 +32,7 @@ function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
-function initialContext(): SongContext {
-  if (typeof window === "undefined") {
-    return { title: "Untitled song", key: "", bpm: 96, tuning: 432, projectId: "", updatedAt: Date.now() };
-  }
-
+function readClientContext(): SongContext {
   const params = new URLSearchParams(window.location.search);
   const saved = readJSON<Partial<SongContext>>(SONG_KEY, {});
   const map = readJSON<{ bpm?: number }>(INKWELL_KEY, {});
@@ -51,19 +55,28 @@ function setNativeRangeValue(input: HTMLInputElement, value: number) {
 }
 
 export function UnifiedInkWorkspace() {
-  const [context, setContext] = useState<SongContext>(() => initialContext());
+  const [context, setContext] = useState<SongContext>(DEFAULT_CONTEXT);
+  const [hydrated, setHydrated] = useState(false);
   const [synced, setSynced] = useState(false);
 
   useEffect(() => {
+    setContext(readClientContext());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     try {
       localStorage.setItem(SONG_KEY, JSON.stringify({ ...context, updatedAt: Date.now() }));
       localStorage.setItem("pipe_dreams_ink_url", window.location.href.split("?")[0]);
     } catch {
       // Browser storage is optional in the preview.
     }
-  }, [context]);
+  }, [context, hydrated]);
 
   useEffect(() => {
+    if (!hydrated) return;
+
     const timer = window.setTimeout(() => {
       const bpm = document.getElementById("bpm") as HTMLInputElement | null;
       if (bpm && Number(bpm.value) !== context.bpm) setNativeRangeValue(bpm, context.bpm);
@@ -83,18 +96,12 @@ export function UnifiedInkWorkspace() {
       window.clearTimeout(timer);
       document.removeEventListener("input", onInput, true);
     };
-  }, [context.bpm]);
+  }, [context.bpm, hydrated]);
 
   const pipesHref = useMemo(() => {
-    if (typeof window === "undefined") return "#";
-    let base = AURAMIX_PREVIEW;
-    try {
-      const queryOverride = new URLSearchParams(window.location.search).get("pipesUrl");
-      base = queryOverride || localStorage.getItem("pipe_dreams_auramix_url") || base;
-    } catch {
-      // Keep the preview fallback.
-    }
-    const url = new URL(base);
+    if (typeof window === "undefined" || !hydrated) return "#";
+    const queryOverride = new URLSearchParams(window.location.search).get("pipesUrl");
+    const url = new URL(queryOverride || AURAMIX_PREVIEW);
     url.searchParams.set("song", context.title);
     if (context.key.trim()) url.searchParams.set("key", context.key.trim());
     url.searchParams.set("bpm", String(context.bpm));
@@ -103,7 +110,7 @@ export function UnifiedInkWorkspace() {
     url.searchParams.set("from", "ink");
     url.searchParams.set("inkUrl", window.location.href.split("?")[0]);
     return url.toString();
-  }, [context]);
+  }, [context, hydrated]);
 
   const change = <K extends keyof SongContext>(key: K, value: SongContext[K]) => {
     setContext((current) => ({ ...current, [key]: value, updatedAt: Date.now() }));
@@ -188,6 +195,7 @@ export function UnifiedInkWorkspace() {
             <div className="flex items-end">
               <a
                 href={pipesHref}
+                aria-disabled={!hydrated}
                 className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-copper px-4 text-sm font-semibold text-ink no-underline transition hover:brightness-110 lg:w-auto"
               >
                 <Mic2 size={16} />
@@ -199,7 +207,7 @@ export function UnifiedInkWorkspace() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-paper/50">
             <span className="inline-flex items-center gap-1.5"><Sparkles size={13} /> One song context follows the handoff.</span>
             <span className="inline-flex items-center gap-1.5"><SlidersHorizontal size={13} /> BPM is synced to INK’s existing playback control.</span>
-            <span>{synced ? "Song state connected." : "Connecting song state…"}</span>
+            <span>{hydrated && synced ? "Song state connected." : "Connecting song state…"}</span>
           </div>
         </div>
       </section>
