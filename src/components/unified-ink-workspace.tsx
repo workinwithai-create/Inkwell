@@ -4,6 +4,7 @@ import { InkwellDesk } from "@/components/inkwell-desk";
 
 const SONG_KEY = "pipe_dreams_song_context_v1";
 const INKWELL_KEY = "inkwell-map-v1";
+const AURAMIX_PREVIEW = "https://auramix-git-preview-mantra-unified-workflow-release-forge.vercel.app/";
 
 type SongContext = {
   title: string;
@@ -86,11 +87,12 @@ export function UnifiedInkWorkspace() {
 
   const pipesHref = useMemo(() => {
     if (typeof window === "undefined") return "#";
-    let base = "https://auramix.workinwithai.com/";
+    let base = AURAMIX_PREVIEW;
     try {
-      base = localStorage.getItem("pipe_dreams_auramix_url") || base;
+      const queryOverride = new URLSearchParams(window.location.search).get("pipesUrl");
+      base = queryOverride || localStorage.getItem("pipe_dreams_auramix_url") || base;
     } catch {
-      // Keep the production fallback.
+      // Keep the preview fallback.
     }
     const url = new URL(base);
     url.searchParams.set("song", context.title);
